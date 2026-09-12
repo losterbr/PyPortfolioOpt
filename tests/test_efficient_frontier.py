@@ -107,6 +107,23 @@ def test_min_volatility():
     )
 
 
+def test_min_volatility_aligns_covariance_labels():
+    mean_returns = pd.Series({"A": 0.1, "B": 0.2})
+    cov_matrix = pd.DataFrame(
+        [[0.01, 0.0], [0.0, 1.0]],
+        index=["A", "B"],
+        columns=["A", "B"],
+    )
+
+    expected = EfficientFrontier(mean_returns, cov_matrix).min_volatility()
+    reordered_cov = cov_matrix.loc[["B", "A"], ["B", "A"]]
+    actual = EfficientFrontier(mean_returns, reordered_cov).min_volatility()
+
+    pd.testing.assert_series_equal(
+        pd.Series(actual), pd.Series(expected), check_names=False
+    )
+
+
 @pytest.mark.skipif(
     not _check_soft_dependencies(["ecos"], severity="none"),
     reason="skip test if ecos is not installed in environment",

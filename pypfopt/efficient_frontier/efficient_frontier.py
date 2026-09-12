@@ -90,6 +90,27 @@ class EfficientFrontier(BaseConvexOptimizer):
         TypeError
             if ``cov_matrix`` is not a dataframe or array
         """
+        # Only pandas inputs carry asset labels; arrays and lists are positional.
+        # When both inputs are labeled, align their positions before conversion.
+        if isinstance(expected_returns, pd.Series) and isinstance(
+            cov_matrix, pd.DataFrame
+        ):
+            expected_tickers = expected_returns.index
+            labels_match = (
+                expected_tickers.is_unique
+                and cov_matrix.index.is_unique
+                and cov_matrix.columns.is_unique
+                and len(expected_tickers) == len(cov_matrix.index)
+                and len(expected_tickers) == len(cov_matrix.columns)
+                and expected_tickers.isin(cov_matrix.index).all()
+                and expected_tickers.isin(cov_matrix.columns).all()
+            )
+            if not labels_match:
+                raise ValueError(
+                    "Covariance matrix labels do not match expected returns"
+                )
+            cov_matrix = cov_matrix.loc[expected_tickers, expected_tickers]
+
         # Inputs
         self.cov_matrix = self._validate_cov_matrix(cov_matrix)
         self.expected_returns = self._validate_expected_returns(expected_returns)
