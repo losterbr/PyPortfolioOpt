@@ -1331,6 +1331,18 @@ def test_efficient_return_error():
         ef.efficient_return(max_ret + 0.01)
 
 
+def test_efficient_return_reuses_zero_max_return(monkeypatch):
+    ef = setup_efficient_frontier()
+    monkeypatch.setattr(ef, "_max_return_value", 0.0)
+    monkeypatch.setattr(
+        ef,
+        "_max_return",
+        lambda: pytest.fail("cached maximum return was recomputed"),
+    )
+
+    ef.efficient_return(0.0)
+
+
 @pytest.mark.skipif(
     not _check_soft_dependencies(["ecos"], severity="none"),
     reason="skip test if ecos is not installed in environment",

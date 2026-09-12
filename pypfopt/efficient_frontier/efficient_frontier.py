@@ -264,7 +264,7 @@ class EfficientFrontier(BaseConvexOptimizer):
         Returns
         -------
         OrderedDict
-            asset weights for the return-minimising portfolio
+            asset weights for the return-maximising portfolio
         """
         if self.expected_returns is None:
             raise ValueError("no expected returns provided")
@@ -279,8 +279,7 @@ class EfficientFrontier(BaseConvexOptimizer):
 
         if return_value:
             return -self._opt.value
-        else:
-            return res
+        return res
 
     def max_sharpe(self, risk_free_rate=0.0):
         """
@@ -324,7 +323,7 @@ class EfficientFrontier(BaseConvexOptimizer):
 
         # Note: objectives are not scaled by k. Hence there are subtle differences
         # between how these objectives work for max_sharpe vs min_volatility
-        if len(self._additional_objectives) > 0:
+        if self._additional_objectives:
             warnings.warn(
                 "max_sharpe transforms the optimization problem so additional objectives may not work as expected."
             )
@@ -422,8 +421,6 @@ class EfficientFrontier(BaseConvexOptimizer):
             if ``target_volatility`` is not a positive float
         ValueError
             if no portfolio can be found with volatility equal to ``target_volatility``
-        ValueError
-            if ``risk_free_rate`` is non-numeric
 
         Returns
         -------
@@ -437,9 +434,8 @@ class EfficientFrontier(BaseConvexOptimizer):
 
         if target_volatility < global_min_volatility:
             raise ValueError(
-                "The minimum volatility is {:.3f}. Please use a higher target_volatility".format(
-                    global_min_volatility
-                )
+                f"The minimum volatility is {global_min_volatility:.3f}. "
+                "Please use a higher target_volatility"
             )
 
         update_existing_parameter = self.is_parameter_defined("target_variance")
@@ -488,7 +484,7 @@ class EfficientFrontier(BaseConvexOptimizer):
         """
         if not isinstance(target_return, float):
             raise ValueError("target_return should be a float")
-        if not self._max_return_value:
+        if self._max_return_value is None:
             a = self.deepcopy()
             self._max_return_value = a._max_return()
         if target_return > self._max_return_value:
