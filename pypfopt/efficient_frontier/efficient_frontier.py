@@ -90,6 +90,13 @@ class EfficientFrontier(BaseConvexOptimizer):
             if ``expected_returns`` is not a series, list or array
         TypeError
             if ``cov_matrix`` is not a dataframe or array
+
+        Notes
+        -----
+        Asset labels are aligned automatically only when ``expected_returns`` is a
+        Series and ``cov_matrix`` is a DataFrame. When pandas and array-like inputs
+        are mixed, their values are matched positionally, so they must use the same
+        asset order.
         """
         self.expected_returns, self.cov_matrix, tickers = (
             self._validate_and_format_inputs(expected_returns, cov_matrix)
@@ -111,46 +118,19 @@ class EfficientFrontier(BaseConvexOptimizer):
         expected_returns: pd.Series | list | np.ndarray | None,
         cov_matrix: pd.DataFrame | np.ndarray | None,
     ) -> tuple[np.ndarray | None, np.ndarray, list[Any]]:
-        cov_tickers = None
-        if isinstance(cov_matrix, pd.DataFrame):
-            if cov_matrix.shape[0] != cov_matrix.shape[1]:
-                raise ValueError("cov_matrix must be a square matrix")
-            if not cov_matrix.index.is_unique or not cov_matrix.columns.is_unique:
-                raise ValueError("Covariance matrix labels must be unique")
-            if not cov_matrix.index.isin(cov_matrix.columns).all():
-                raise ValueError(
-                    "Covariance matrix index and columns must contain the same labels"
-                )
-            cov_tickers = cov_matrix.columns
-            cov_matrix = cov_matrix.loc[cov_tickers, cov_tickers]
-            cov_array = cov_matrix.values
-        elif isinstance(cov_matrix, np.ndarray):
-            if cov_matrix.ndim != 2 or cov_matrix.shape[0] != cov_matrix.shape[1]:
-                raise ValueError("cov_matrix must be a square matrix")
-            cov_array = cov_matrix
-        elif cov_matrix is None:
-            raise ValueError("cov_matrix must be provided")
-        else:
-            raise TypeError("cov_matrix is not a dataframe or array")
-
-        expected_tickers = None
-        if expected_returns is None:
-            expected_array = None
-        elif isinstance(expected_returns, pd.Series):
-            expected_tickers = expected_returns.index
-            expected_array = expected_returns.values
-        elif isinstance(expected_returns, list):
-            expected_array = np.array(expected_returns)
-        elif isinstance(expected_returns, np.ndarray):
-            expected_array = expected_returns.ravel()
-        else:
-            raise TypeError("expected_returns is not a series, list or array")
+        """Validate inputs and align labeled data to a common asset order."""
+        cov_array, cov_tickers = EfficientFrontier._validate_and_format_cov_matrix(
+            cov_matrix
+        )
+        expected_array, expected_tickers = (
+            EfficientFrontier._validate_and_format_expected_returns(expected_returns)
+        )
 
         if expected_array is not None and cov_array.shape[0] != len(expected_array):
             raise ValueError("Covariance matrix does not match expected returns")
 
-        # Mixed pandas/array inputs remain positional because their alignment cannot
-        # be verified. A future API revision could consider rejecting this combination.
+        # Labeled pandas inputs can be aligned safely. Mixed pandas/array inputs
+        # remain positional because their alignment cannot be verified.
         if expected_tickers is not None and cov_tickers is not None:
             labels_match = (
                 expected_tickers.is_unique
@@ -160,7 +140,9 @@ class EfficientFrontier(BaseConvexOptimizer):
                 raise ValueError(
                     "Covariance matrix labels do not match expected returns"
                 )
-            cov_array = cov_matrix.loc[expected_tickers, expected_tickers].values
+            # Reorder both covariance axes to match the expected-return order.
+            positions = cov_tickers.get_indexer(expected_tickers)
+            cov_array = cov_array[np.ix_(positions, positions)]
 
         if expected_tickers is not None:
             tickers = list(expected_tickers)
@@ -170,6 +152,46 @@ class EfficientFrontier(BaseConvexOptimizer):
             tickers = list(range(cov_array.shape[0]))
 
         return expected_array, cov_array, tickers
+
+    @staticmethod
+    def _validate_and_format_cov_matrix(
+        cov_matrix: pd.DataFrame | np.ndarray | None,
+    ) -> tuple[np.ndarray, pd.Index | None]:
+        """Validate a covariance matrix and normalize DataFrame row order."""
+        if cov_matrix is None:
+            raise ValueError("cov_matrix must be provided")
+        if not isinstance(cov_matrix, (pd.DataFrame, np.ndarray)):
+            raise TypeError("cov_matrix is not a dataframe or array")
+        if cov_matrix.ndim != 2 or cov_matrix.shape[0] != cov_matrix.shape[1]:
+            raise ValueError("cov_matrix must be a square matrix")
+
+        if isinstance(cov_matrix, np.ndarray):
+            return cov_matrix, None
+        if not cov_matrix.index.is_unique or not cov_matrix.columns.is_unique:
+            raise ValueError("Covariance matrix labels must be unique")
+        if not cov_matrix.index.isin(cov_matrix.columns).all():
+            raise ValueError(
+                "Covariance matrix index and columns must contain the same labels"
+            )
+
+        cov_tickers = cov_matrix.columns
+        cov_array = cov_matrix.loc[cov_tickers, cov_tickers].values
+        return cov_array, cov_tickers
+
+    @staticmethod
+    def _validate_and_format_expected_returns(
+        expected_returns: pd.Series | list | np.ndarray | None,
+    ) -> tuple[np.ndarray | None, pd.Index | None]:
+        """Convert expected returns to a flat array and preserve Series labels."""
+        if expected_returns is None:
+            return None, None
+        if isinstance(expected_returns, pd.Series):
+            return expected_returns.values, expected_returns.index
+        if isinstance(expected_returns, list):
+            return np.array(expected_returns), None
+        if isinstance(expected_returns, np.ndarray):
+            return expected_returns.ravel(), None
+        raise TypeError("expected_returns is not a series, list or array")
 
     def _validate_returns(self, returns):
         """
