@@ -144,6 +144,29 @@ def test_covariance_dataframe_labels_must_be_unique(
         EfficientFrontier(mean_returns, cov_matrix)
 
 
+def test_covariance_dataframe_aligns_index_to_columns():
+    cov_matrix = pd.DataFrame(
+        [[0.01, 0.002], [0.002, 1.0]],
+        index=["A", "B"],
+        columns=["A", "B"],
+    )
+    reordered_index = cov_matrix.loc[["B", "A"]]
+
+    ef = EfficientFrontier(None, reordered_index)
+
+    assert ef.tickers == ["A", "B"]
+    np.testing.assert_array_equal(ef.cov_matrix, cov_matrix.values)
+
+
+def test_covariance_dataframe_axes_must_have_same_labels():
+    cov_matrix = pd.DataFrame(
+        np.eye(2), index=["A", "B"], columns=["A", "C"]
+    )
+
+    with pytest.raises(ValueError, match="must contain the same labels"):
+        EfficientFrontier(None, cov_matrix)
+
+
 @pytest.mark.parametrize(
     "cov_matrix",
     [np.ones((2, 3)), pd.DataFrame(np.ones((2, 3)))],
