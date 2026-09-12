@@ -3,6 +3,7 @@ The ``efficient_frontier`` submodule houses the EfficientFrontier class, which g
 classical mean-variance optimal portfolios for a variety of objectives and constraints
 """
 
+from typing import Any
 import warnings
 
 import cvxpy as cp
@@ -56,13 +57,13 @@ class EfficientFrontier(BaseConvexOptimizer):
 
     def __init__(
         self,
-        expected_returns,
-        cov_matrix,
-        weight_bounds=(0, 1),
-        solver=None,
-        verbose=False,
-        solver_options=None,
-    ):
+        expected_returns: pd.Series | list | np.ndarray | None,
+        cov_matrix: pd.DataFrame | np.ndarray,
+        weight_bounds: tuple | list = (0, 1),
+        solver: str | None = None,
+        verbose: bool = False,
+        solver_options: dict[str, Any] | None = None,
+    ) -> None:
         """
         Parameters
         ----------
@@ -91,6 +92,7 @@ class EfficientFrontier(BaseConvexOptimizer):
             if ``cov_matrix`` is not a dataframe or array
         """
         # Only pandas inputs carry asset labels; arrays and lists are positional.
+        # Mixing labeled and unlabeled inputs is ambiguous, so no alignment is possible.
         # When both inputs are labeled, align their positions before conversion.
         if isinstance(expected_returns, pd.Series) and isinstance(
             cov_matrix, pd.DataFrame
