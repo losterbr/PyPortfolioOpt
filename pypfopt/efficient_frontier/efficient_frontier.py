@@ -93,17 +93,22 @@ class EfficientFrontier(BaseConvexOptimizer):
         """
         # Only pandas inputs carry asset labels; arrays and lists are positional.
         # Mixing labeled and unlabeled inputs is ambiguous, so no alignment is possible.
+        # One might consider to either expect both to be pd or none.
         # When both inputs are labeled, align their positions before conversion.
+        validated_cov_matrix = self._validate_cov_matrix(cov_matrix)
+        validated_expected_returns = self._validate_expected_returns(expected_returns)
+        if (
+            validated_expected_returns is not None
+            and validated_cov_matrix.shape[0] != len(validated_expected_returns)
+        ):
+            raise ValueError("Covariance matrix does not match expected returns")
+
         if isinstance(expected_returns, pd.Series) and isinstance(
             cov_matrix, pd.DataFrame
         ):
             expected_tickers = expected_returns.index
             labels_match = (
                 expected_tickers.is_unique
-                and cov_matrix.index.is_unique
-                and cov_matrix.columns.is_unique
-                and len(expected_tickers) == len(cov_matrix.index)
-                and len(expected_tickers) == len(cov_matrix.columns)
                 and expected_tickers.isin(cov_matrix.index).all()
                 and expected_tickers.isin(cov_matrix.columns).all()
             )
@@ -111,18 +116,20 @@ class EfficientFrontier(BaseConvexOptimizer):
                 raise ValueError(
                     "Covariance matrix labels do not match expected returns"
                 )
-            cov_matrix = cov_matrix.loc[expected_tickers, expected_tickers]
+            validated_cov_matrix = cov_matrix.loc[
+                expected_tickers, expected_tickers
+            ].values
 
         # Inputs
-        self.cov_matrix = self._validate_cov_matrix(cov_matrix)
-        self.expected_returns = self._validate_expected_returns(expected_returns)
+        self.cov_matrix = validated_cov_matrix
+        self.expected_returns = validated_expected_returns
         self._max_return_value = None
         self._market_neutral = None
 
         if self.expected_returns is None:
-            num_assets = len(cov_matrix)
+            num_assets = self.cov_matrix.shape[0]
         else:
-            num_assets = len(expected_returns)
+            num_assets = len(self.expected_returns)
 
         # Labels
         if isinstance(expected_returns, pd.Series):
@@ -131,10 +138,6 @@ class EfficientFrontier(BaseConvexOptimizer):
             tickers = list(cov_matrix.columns)
         else:  # use integer labels
             tickers = list(range(num_assets))
-
-        if expected_returns is not None and cov_matrix is not None:
-            if cov_matrix.shape != (num_assets, num_assets):
-                raise ValueError("Covariance matrix does not match expected returns")
 
         super().__init__(
             len(tickers),
@@ -163,8 +166,14 @@ class EfficientFrontier(BaseConvexOptimizer):
         if cov_matrix is None:
             raise ValueError("cov_matrix must be provided")
         elif isinstance(cov_matrix, pd.DataFrame):
+            if cov_matrix.shape[0] != cov_matrix.shape[1]:
+                raise ValueError("cov_matrix must be a square matrix")
+            if not cov_matrix.index.is_unique or not cov_matrix.columns.is_unique:
+                raise ValueError("Covariance matrix labels must be unique")
             return cov_matrix.values
         elif isinstance(cov_matrix, np.ndarray):
+            if cov_matrix.ndim != 2 or cov_matrix.shape[0] != cov_matrix.shape[1]:
+                raise ValueError("cov_matrix must be a square matrix")
             return cov_matrix
         else:
             raise TypeError("cov_matrix is not a dataframe or array")

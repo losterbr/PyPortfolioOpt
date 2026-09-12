@@ -124,6 +124,51 @@ def test_min_volatility_aligns_covariance_labels():
     )
 
 
+@pytest.mark.parametrize(
+    "index, columns",
+    [
+        (["A", "A"], ["A", "B"]),
+        (["A", "B"], ["A", "A"]),
+    ],
+)
+@pytest.mark.parametrize(
+    "mean_returns",
+    [pd.Series({"A": 0.1, "B": 0.2}), np.array([0.1, 0.2])],
+)
+def test_covariance_dataframe_labels_must_be_unique(
+    index, columns, mean_returns
+):
+    cov_matrix = pd.DataFrame(np.eye(2), index=index, columns=columns)
+
+    with pytest.raises(ValueError, match="Covariance matrix labels must be unique"):
+        EfficientFrontier(mean_returns, cov_matrix)
+
+
+@pytest.mark.parametrize(
+    "cov_matrix",
+    [np.ones((2, 3)), pd.DataFrame(np.ones((2, 3)))],
+)
+def test_covariance_matrix_must_be_square(cov_matrix):
+    with pytest.raises(ValueError, match="cov_matrix must be a square matrix"):
+        EfficientFrontier(None, cov_matrix)
+
+
+@pytest.mark.parametrize(
+    "mean_returns",
+    [pd.Series({"A": 0.1, "B": 0.2, "C": 0.3}), np.array([0.1, 0.2, 0.3])],
+)
+@pytest.mark.parametrize(
+    "cov_matrix",
+    [
+        pd.DataFrame(np.eye(2), index=["A", "B"], columns=["A", "B"]),
+        np.eye(2),
+    ],
+)
+def test_covariance_matrix_must_match_expected_returns(mean_returns, cov_matrix):
+    with pytest.raises(ValueError, match="Covariance matrix does not match"):
+        EfficientFrontier(mean_returns, cov_matrix)
+
+
 @pytest.mark.skipif(
     not _check_soft_dependencies(["ecos"], severity="none"),
     reason="skip test if ecos is not installed in environment",
