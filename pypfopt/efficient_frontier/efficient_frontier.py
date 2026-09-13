@@ -283,11 +283,13 @@ class EfficientFrontier(BaseConvexOptimizer):
 
     def max_sharpe(self, risk_free_rate=0.0):
         """
-        Maximise the Sharpe Ratio. The result is also referred to as the tangency portfolio,
-        as it is the portfolio for which the capital market line is tangent to the efficient frontier.
+        Maximise the Sharpe Ratio. The result is also referred to as the tangency
+        portfolio, as it is the portfolio for which the capital market line is tangent
+        to the efficient frontier.
 
-        This is a convex optimization problem after making a certain variable substitution. See
-        `Cornuejols and Tutuncu (2006) <http://web.math.ku.dk/~rolf/CT_FinOpt.pdf>`_ for more.
+        This is a convex optimization problem after making a certain variable
+        substitution. See `Cornuejols and Tutuncu (2006)
+        <http://web.math.ku.dk/~rolf/CT_FinOpt.pdf>`_ for more.
 
         Parameters
         ----------
@@ -311,7 +313,8 @@ class EfficientFrontier(BaseConvexOptimizer):
 
         if max(self.expected_returns) <= risk_free_rate:
             raise ValueError(
-                "at least one of the assets must have an expected return exceeding the risk-free rate"
+                "at least one of the assets must have an expected return exceeding "
+                "the risk-free rate"
             )
 
         self._risk_free_rate = risk_free_rate
@@ -325,7 +328,8 @@ class EfficientFrontier(BaseConvexOptimizer):
         # between how these objectives work for max_sharpe vs min_volatility
         if self._additional_objectives:
             warnings.warn(
-                "max_sharpe transforms the optimization problem so additional objectives may not work as expected."
+                "max_sharpe transforms the optimization problem so additional "
+                "objectives may not work as expected."
             )
         for obj in self._additional_objectives:
             self._objective += obj
@@ -486,7 +490,7 @@ class EfficientFrontier(BaseConvexOptimizer):
             raise ValueError("target_return should be a float")
         if self._max_return_value is None:
             a = self.deepcopy()
-            self._max_return_value = a._max_return()
+            self._max_return_value = a._max_return()  # pylint: disable=protected-access
         if target_return > self._max_return_value:
             raise ValueError(
                 "target_return must be lower than the maximum possible return"
